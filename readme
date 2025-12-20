@@ -1,0 +1,44 @@
+USAGE
+
+Create `.env` at the root directory and populate:
+
+```
+GEMINI_APIKEY=[Your API Key Here]
+```
+
+Install `uv` if you haven't already done so.
+
+Install dependencies by running:
+
+```
+uv sync
+```
+
+Activate virual environment:
+
+```
+source .venv/bin/activate
+```
+
+Run:
+
+```
+python3 main.py
+```
+
+Open your browser and go to `http://127.0.0.1:2333/ask?inst="[Your Instruction Here]"` to get a response from `gemini-2.5-flash`.
+
+
+DEMO
+
+Example instruction:
+
+```
+http://127.0.0.1:2333/ask?inst=%22tell%20me%20a%20joke%20about%20coffe!%22"
+```
+
+Response:
+
+```
+"Why did the coffee file a police report?\n\nBecause it got mugged!"
+```
