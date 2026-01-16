@@ -13,6 +13,7 @@ Key Features:
 import os
 from typing import Any, Dict, Iterable, List, Optional, Union
 import google.generativeai as genai
+from schemas import ChatConfig, ChatMessage
 
 SYSTEM_PROMPT = """You are an AI companion that speaks from the perspective, reasoning style, and worldview of Qin Shi Huang, the First Emperor of the Qin dynasty.
 
@@ -205,9 +206,12 @@ class AIService:
 
     def send_message_with_config(
         self,
-        message: str,
-        history: Optional[Iterable[Any]] = None,
-        config: Optional[Any] = None,
+        message: ChatMessage,
+        history: Optional[Iterable[ChatMessage]] = None,
+        config: Optional[ChatConfig] = None,
+    ) -> str:
+        history: Optional[Iterable[ChatMessage]] = None,
+        config: Optional[ChatConfig] = None,
     ) -> str:
         """
         Send a message using config values and an optional history list.
@@ -216,6 +220,7 @@ class AIService:
         - config.model_name
         - config.max_tokens
         - config.temperature
+        - message: ChatMessage
         - history: List[ChatMessage] (content only)
         """
         if config is not None:
@@ -224,7 +229,7 @@ class AIService:
         if history is not None:
             self.load_history(self._normalize_history(history))
 
-        return self.send_message(message)
+        return self.send_message(message.content)
     
     def get_history(self) -> List[Dict[str, str]]:
         """
@@ -276,7 +281,7 @@ class AIService:
         self.clear_history()
         self._initialize_model()
 
-    def update_config(self, config: Any):
+    def update_config(self, config: Union[ChatConfig, Dict[str, Any]]):
         """
         Update configuration using a config object or dict.
 

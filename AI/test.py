@@ -16,6 +16,7 @@ To run this test:
 """
 
 from ai_service import AIService, SYSTEM_PROMPT, quick_chat
+from schemas import ChatConfig, ChatMessage
 
 
 def print_section(title: str):
@@ -55,7 +56,7 @@ def test_conversation_history(service: AIService):
     # Clear any previous history
     service.clear_history()
     
-    # Have a multi-turn conversation
+    # Have a multi-turn conversation (history uses ChatMessage from schemas.py)
     print("\n📤 User: 'My favorite color is blue'")
     response1 = service.send_message("My favorite color is blue")
     print(f"📥 AI: {response1}")
@@ -107,13 +108,13 @@ def test_history_management(service: AIService):
     service.clear_history()
     print("✓ History cleared")
     
-    # Load pre-existing history
+    # Load pre-existing history (use ChatMessage class from schemas.py)
     print("\n📋 Loading pre-existing conversation history...")
     pre_loaded_history = [
-        {"role": "user", "content": "My name is Alice"},
-        {"role": "assistant", "content": "Nice to meet you, Alice! How can I help you today?"},
-        {"role": "user", "content": "I like programming in Python"},
-        {"role": "assistant", "content": "That's great! Python is a wonderful language."}
+        ChatMessage(content="My name is Alice"),
+        ChatMessage(content="Nice to meet you, Alice! How can I help you today?"),
+        ChatMessage(content="I like programming in Python"),
+        ChatMessage(content="That's great! Python is a wonderful language.")
     ]
     
     service.load_history(pre_loaded_history)
@@ -131,9 +132,35 @@ def test_history_management(service: AIService):
         print("\n⚠️  Warning: AI might not have fully integrated the loaded history")
 
 
+def test_schema_config_message(service: AIService):
+    """Test 5: Use schemas.ChatMessage and schemas.ChatConfig"""
+    print_section("TEST 5: schemas.py Integration")
+
+    # Build config and message using schemas.py classes
+    config = ChatConfig(
+        model_name="gemini-2.5-flash",
+        max_tokens=150,
+        temperature=0.7,
+    )
+    message = ChatMessage(content="How should a ruler secure lasting unity?")
+    history = [
+        ChatMessage(content="I seek counsel on the nature of order."),
+        ChatMessage(content="Order is born of law and discipline.")
+    ]
+
+    response = service.send_message_with_config(
+        message=message,
+        history=history,
+        config=config,
+    )
+    print(f"📥 Response: {response}")
+
+    print("\n✅ Test 5 Passed: schemas.py classes work with AIService!")
+
+
 def test_quick_chat():
-    """Test 5: Quick chat convenience function"""
-    print_section("TEST 5: Quick Chat Function")
+    """Test 6: Quick chat convenience function"""
+    print_section("TEST 6: Quick Chat Function")
     
     print("Testing the quick_chat() convenience function...")
     print("This is useful for one-off questions without managing a service instance.")
@@ -145,7 +172,7 @@ def test_quick_chat():
     )
     print(f"📥 Response: {response}")
     
-    print("\n✅ Test 5 Passed: Quick chat function works!")
+    print("\n✅ Test 6 Passed: Quick chat function works!")
 
 
 def run_all_tests():
@@ -167,7 +194,10 @@ def run_all_tests():
         # Test 4: History management
         test_history_management(service)
         
-        # Test 5: Quick chat
+        # Test 5: schemas.py integration
+        test_schema_config_message(service)
+
+        # Test 6: Quick chat
         test_quick_chat()
         
         
