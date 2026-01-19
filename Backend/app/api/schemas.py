@@ -1,7 +1,14 @@
+"""
+Schemas for chat request and response using Pydantic
+"""
+
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 
 class ChatMessage(BaseModel):
+    """
+    Represents a single message in the chat history
+    """
     content: str = Field(
             ...,
             min_length=1,
@@ -9,6 +16,9 @@ class ChatMessage(BaseModel):
             )
 
 class ChatConfig(BaseModel):
+    """
+    Configuration for the AI Model
+    """
     model_name: str = Literal(
             default="gemini-2.5-flash",
             description="The model name to be used"
@@ -27,6 +37,9 @@ class ChatConfig(BaseModel):
             )
 
 class ChatRequest(BaseModel):
+    """
+    Represents a chat request from the user
+    """
     message: str = Field(
             ...,
             min_length=1,
@@ -42,6 +55,9 @@ class ChatRequest(BaseModel):
             )
 
 class ChatResponse(BaseModel):
+    """
+    Represents the response from the AI Model
+    """
     status: int = Field(
             ...,
             description="HTTP Status Code"
@@ -53,4 +69,11 @@ class ChatResponse(BaseModel):
     error: Optional[str] = Field(
             default=None,
             description="Error message. None on success."
+            )
 
+__all__ = [
+    "ChatMessage",
+    "ChatConfig",
+    "ChatRequest",
+    "ChatResponse"
+]

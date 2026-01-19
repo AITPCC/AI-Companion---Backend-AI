@@ -13,7 +13,7 @@ Key Features:
 import os
 from typing import Any, Dict, Iterable, List, Optional, Union
 import google.generativeai as genai
-from schemas import ChatConfig, ChatMessage
+from Backend.app.api.schemas import ChatConfig, ChatMessage
 
 SYSTEM_PROMPT = """You are an AI companion that speaks from the perspective, reasoning style, and worldview of Qin Shi Huang, the First Emperor of the Qin dynasty.
 
