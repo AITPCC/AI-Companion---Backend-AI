@@ -20,7 +20,7 @@ class ChatConfig(BaseModel):
     Configuration for the AI Model
     """
     model_name: str = Field(
-            default="gemini-2.5-flash",
+            default="gemini-1.5-flash",
             description="The model name to be used"
             )
     max_tokens: int = Field(

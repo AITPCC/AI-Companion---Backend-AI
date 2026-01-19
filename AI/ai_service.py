@@ -12,7 +12,9 @@ Key Features:
 
 import os
 from typing import Any, Dict, Iterable, List, Optional, Union
-import google.generativeai as genai
+from dotenv import load_dotenv
+import google.genai as genai
+from google.genai import types
 from Backend.app.api.schemas import ChatConfig, ChatMessage
 
 SYSTEM_PROMPT = """You are an AI companion that speaks from the perspective, reasoning style, and worldview of Qin Shi Huang, the First Emperor of the Qin dynasty.
@@ -100,10 +102,8 @@ class AIService:
     
     def __init__(
         self,
+        config: ChatConfig,
         api_key: Optional[str] = None,
-        model_name: str = "gemini-2.5-flash",
-        max_tokens: int = 150,
-        temperature: float = 0.7,
         system_prompt: Optional[str] = None,
     ):
         """
@@ -112,16 +112,19 @@ class AIService:
         Args:
             api_key (str, optional): Your Google AI API key. 
                                     If not provided, reads from GOOGLE_API_KEY environment variable.
-            model_name (str): Which Gemini model to use. Default is "gemini-2.5-flash"
-                            Common options: "gemini-2.5-flash", "gemini-pro", "gemini-1.5-pro"
-            max_tokens (int): Maximum number of output tokens. Default is 150.
-            temperature (float): Creativity level. 0.0 is deterministic, 1.0 is creative.
+            config (ChatConfig): Model configuration including model_name, max_tokens, temperature.
             system_prompt (str, optional): Initial instructions that define how the AI should behave.
                                           Example: "You are a helpful coding assistant."
         
         Raises:
             ValueError: If no API key is provided or found in environment variables.
         """
+        # Load environment variables (from .env if present)
+        try:
+            load_dotenv()
+        except Exception:
+            pass
+
         # Get API key from parameter or environment variable
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
         if not self.api_key:
@@ -129,13 +132,11 @@ class AIService:
                 "No API key provided. Either pass api_key parameter or set GOOGLE_API_KEY environment variable."
             )
         
-        # Configure the Google AI SDK
-        genai.configure(api_key=self.api_key)
+        # Create client
+        self.client = genai.Client(api_key=self.api_key)
         
         # Store configuration
-        self.model_name = model_name
-        self.max_tokens = max_tokens
-        self.temperature = temperature
+        self.config: ChatConfig = config
         self.system_prompt = system_prompt or SYSTEM_PROMPT
         
         # Initialize conversation history
@@ -147,23 +148,20 @@ class AIService:
         self._initialize_model()
     
     def _initialize_model(self):
-        """
-        Internal method to initialize the Gemini model with the system prompt.
-        
-        This is called automatically during __init__.
-        """
-        # Create the model with system instructions
-        self.model = genai.GenerativeModel(
-            model_name=self.model_name,
+        """Prepare generation config."""
+        # Optional validation
+        try:
+            available = [m.name for m in self.client.models.list()]
+            if self.config.model_name not in available:
+                raise ValueError(f"Invalid model_name: {self.config.model_name}")
+        except Exception:
+            pass
+        # Generation configuration
+        self._gen_config = types.GenerateContentConfig(
             system_instruction=self.system_prompt,
-            generation_config={
-                "max_output_tokens": self.max_tokens,
-                "temperature": self.temperature,
-            },
+            temperature=self.config.temperature,
+            max_output_tokens=self.config.max_tokens,
         )
-        
-        # Start a chat session (this allows us to maintain conversation history)
-        self.chat_session = self.model.start_chat(history=[])
     
     def send_message(self, message: str) -> str:
         """
@@ -191,10 +189,13 @@ class AIService:
         })
         
         # Send message to AI and get response
-        response = self.chat_session.send_message(message)
-        
-        # Extract the text from the response
-        response_text = response.text
+        contents = [types.Content(role="user", parts=[types.Part(text=message)])]
+        response = self.client.models.generate_content(
+            model=self.config.model_name,
+            contents=contents,
+            config=self._gen_config,
+        )
+        response_text = getattr(response, "text", "")
         
         # Add AI response to history
         self.history.append({
@@ -256,8 +257,6 @@ class AIService:
             # AI won't remember "John" because we cleared the history
         """
         self.history = []
-        # Restart the chat session
-        self.chat_session = self.model.start_chat(history=[])
     
     def set_system_prompt(self, new_prompt: str):
         """
@@ -293,11 +292,11 @@ class AIService:
             temperature = config.get("temperature", temperature)
 
         if model_name:
-            self.model_name = model_name
+            self.config.model_name = model_name
         if max_tokens is not None:
-            self.max_tokens = max_tokens
+            self.config.max_tokens = max_tokens
         if temperature is not None:
-            self.temperature = temperature
+            self.config.temperature = temperature
 
         # Reinitialize to apply model/config changes.
         self._initialize_model()
@@ -392,14 +391,8 @@ def list_available_models(api_key: Optional[str] = None) -> List[str]:
     if not api_key:
         raise ValueError("No API key provided")
     
-    genai.configure(api_key=api_key)
-    
-    models = []
-    for model in genai.list_models():
-        # Only include models that support generateContent
-        if 'generateContent' in model.supported_generation_methods:
-            models.append(model.name)
-    
+    client = genai.Client(api_key=api_key)
+    models = [m.name for m in client.models.list()]
     return models
 
 
@@ -423,7 +416,9 @@ def quick_chat(message: str, api_key: Optional[str] = None, system_prompt: Optio
         >>> print(response)
         4
     """
-    service = AIService(api_key=api_key, system_prompt=system_prompt)
+    # Use default ChatConfig for quick usage
+    default_cfg = ChatConfig()
+    service = AIService(config=default_cfg, api_key=api_key, system_prompt=system_prompt)
     return service.send_message(message)
 
 

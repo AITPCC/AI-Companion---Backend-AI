@@ -3,7 +3,7 @@ USAGE
 Create `.env` at the root directory and populate:
 
 ```
-GEMINI_APIKEY=[Your API Key Here]
+GOOGLE_API_KEY=[Your API Key Here]
 ```
 
 Install `uv` if you haven't already done so.
@@ -26,19 +26,10 @@ Run:
 python3 main.py
 ```
 
-Open your browser and go to `http://127.0.0.1:2333/ask?inst="[Your Instruction Here]"` to get a response from `gemini-2.5-flash`.
-
-
-DEMO
-
-Example instruction:
+Run this `curl` command for a sample conversation:
 
 ```
-http://127.0.0.1:2333/ask?inst=%22tell%20me%20a%20joke%20about%20coffe!%22"
-```
-
-Response:
-
-```
-"Why did the coffee file a police report?\n\nBecause it got mugged!"
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello!", "history": [], "config": {"model_name":"gemini-2.5-flash","max_tokens":150,"temperature":0.7}}'
 ```
