@@ -3,7 +3,7 @@ Schemas for chat request and response using Pydantic
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 class ChatMessage(BaseModel):
     """
@@ -19,7 +19,7 @@ class ChatConfig(BaseModel):
     """
     Configuration for the AI Model
     """
-    model_name: str = Literal(
+    model_name: str = Field(
             default="gemini-2.5-flash",
             description="The model name to be used"
             )
@@ -31,8 +31,8 @@ class ChatConfig(BaseModel):
             )
     temperature: float = Field(
             default=0.7,
-            le=0.,
-            ge=1.,
+            ge=0.0,
+            le=1.0,
             description="Creativity level. 0.0 is deterministic, 1.0 is creative"
             )
 

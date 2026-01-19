@@ -210,9 +210,6 @@ class AIService:
         history: Optional[Iterable[ChatMessage]] = None,
         config: Optional[ChatConfig] = None,
     ) -> str:
-        history: Optional[Iterable[ChatMessage]] = None,
-        config: Optional[ChatConfig] = None,
-    ) -> str:
         """
         Send a message using config values and an optional history list.
 
