@@ -15,7 +15,7 @@ To run this test:
     python test.py
 """
 
-from app.ai.ai_service import AIService
+from app.services.ai_service import AIService
 from app.ai.prompts.chat_system_prompt import SYSTEM_PROMPT
 from app.schema.schemas import ChatConfig, ChatMessage
 
