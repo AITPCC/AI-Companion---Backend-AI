@@ -1,6 +1,7 @@
 from dotenv import dotenv_values
 import google.genai as genai
 
+
 class GeminiClient:
     def __init__(self):
         config = dotenv_values(".env")
@@ -10,7 +11,6 @@ class GeminiClient:
 
     def call(self, instruction: str) -> str:
         response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=instruction
+            model="gemini-2.5-flash", contents=instruction
         )
         return response.text

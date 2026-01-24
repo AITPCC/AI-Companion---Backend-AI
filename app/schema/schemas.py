@@ -21,17 +21,8 @@ class ChatConfig(BaseModel):
     Configuration for the AI Model
     """
 
-    model_name: str = Field(
-        default="gemini-1.5-flash", description="The model name to be used"
-    )
-    max_tokens: int = Field(
-        default=150, ge=1, le=1145, description="Rate limit on the number of tokens"
-    )
-    temperature: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Creativity level. 0.0 is deterministic, 1.0 is creative",
+    mode: Optional[str] = Field(
+        default="history_figure", description="The AI Companion mode to apply"
     )
 
 

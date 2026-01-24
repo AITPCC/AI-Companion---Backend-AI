@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
 from app.schema.schemas import ChatRequest, ChatResponse
-from app.ai.ai_service import AIService
+from app.services.ai_service import ai_service
 from app.logger import get_logger
 
 logger = get_logger(name=__name__)
@@ -19,8 +19,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
     try:
-        service = AIService(config=request.config)
-        reply = service.send_message(request.message)
+        reply = ai_service.send_message(request.message)
         return ChatResponse(status=status.HTTP_200_OK, content=reply, error=None)
     except ValueError as e:
         logger.warning(f"Validation error: {e}")
