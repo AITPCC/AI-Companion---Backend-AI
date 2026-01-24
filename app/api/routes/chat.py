@@ -2,9 +2,9 @@ from fastapi import APIRouter, status
 
 from app.schema.schemas import ChatRequest, ChatResponse
 from app.ai.ai_service import AIService
-import logging
+from app.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(name=__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

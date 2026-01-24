@@ -15,8 +15,9 @@ To run this test:
     python test.py
 """
 
-from ai_service import AIService, SYSTEM_PROMPT, quick_chat
-from schemas import ChatConfig, ChatMessage
+from app.ai.ai_service import AIService
+from app.ai.prompts.chat_system_prompt import SYSTEM_PROMPT
+from app.schema.schemas import ChatConfig, ChatMessage
 
 
 def print_section(title: str):
@@ -160,7 +161,7 @@ def test_schema_config_message(service: AIService):
     print("\n✅ Test 5 Passed: schemas.py classes work with AIService!")
 
 
-def test_quick_chat():
+def test_quick_chat(service: AIService):
     """Test 6: Quick chat convenience function"""
     print_section("TEST 6: Quick Chat Function")
 
@@ -168,13 +169,12 @@ def test_quick_chat():
     print("This is useful for one-off questions without managing a service instance.")
 
     print("\n📤 Quick question: 'What is 10 + 25?'")
-    response = quick_chat(
+    response = service.send_message(
         "What is 10 + 25? Just give me the number.",
-        system_prompt="You are a calculator. Give only numeric answers.",
     )
     print(f"📥 Response: {response}")
-
     print("\n✅ Test 6 Passed: Quick chat function works!")
+    return service
 
 
 def run_all_tests():
@@ -200,7 +200,7 @@ def run_all_tests():
         test_schema_config_message(service)
 
         # Test 6: Quick chat
-        test_quick_chat()
+        test_quick_chat(service)
 
     except ValueError as e:
         print("\n❌ ERROR: API Key not found!")
