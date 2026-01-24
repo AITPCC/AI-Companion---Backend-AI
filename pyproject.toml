@@ -1,7 +1,7 @@
 [project]
-name = "aipc"
+name = "ai-companion"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI Companion for AITPCC"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
