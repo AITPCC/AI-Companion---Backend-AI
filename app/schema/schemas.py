@@ -32,7 +32,7 @@ class ChatRequest(BaseModel):
     """
 
     message: str = Field(..., min_length=1, description="The message sent by the user")
-    history: List[ChatMessage] = Field(default=[], description="History messages")
+    history: Optional[List[ChatMessage]] = Field(default=[], description="History messages")
     config: ChatConfig = Field(..., description="Configs for the AI Model")
 
 

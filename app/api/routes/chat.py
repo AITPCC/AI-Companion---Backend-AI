@@ -9,7 +9,7 @@ logger = get_logger(name=__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-@router.post("/", response_model=ChatResponse)
+@router.post("/completions", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     if not request.message or not request.message.strip():
         return ChatResponse(
