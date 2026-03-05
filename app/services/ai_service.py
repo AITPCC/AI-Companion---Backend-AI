@@ -99,7 +99,18 @@ class AIService:
         self.history.append({"role": "user", "content": message})
 
         # Send message to AI and get response
-        contents = [types.Content(role="user", parts=[types.Part(text=message)])]
+        contents = []
+        for msg in self.history:
+            # Ensure the AI's role is set to "model" for the Gemini API
+            role = "model" if msg["role"] in ["assistant", "model"] else "user"
+
+            contents.append(
+                    types.Content(
+                        role=role,
+                        parts=[types.Part(text=msg["content"])]
+                        )
+                    )
+
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=contents,
