@@ -76,15 +76,13 @@ class AIService:
             max_output_tokens=self.max_output_tokens,
         )
 
-    def send_message(self, message: str) -> str:
+    def send_message(self, message: str | list[types.Content]) -> str:
         """
         Send a message to the AI and get a response.
 
-        This method automatically maintains the conversation history, so the AI
-        remembers what was said earlier in the conversation.
-
         Args:
-            message (str): The message/question you want to send to the AI
+            message: The current message text, or a prepared Gemini content list
+                containing request history followed by the current message.
 
         Returns:
             str: The AI's response
@@ -95,22 +93,17 @@ class AIService:
             >>> print(response)
             Python is a high-level programming language...
         """
-        # Add user message to history
-        self.history.append({"role": "user", "content": message})
+        if isinstance(message, str):
+            contents = [types.Content(role="user", parts=[types.Part(text=message)])]
+        else:
+            contents = message
 
-        # Send message to AI and get response
-        contents = [types.Content(role="user", parts=[types.Part(text=message)])]
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=contents,
             config=self._gen_config,
         )
-        response_text = getattr(response, "text", "")
-
-        # Add AI response to history
-        self.history.append({"role": "assistant", "content": response_text})
-
-        return response_text
+        return getattr(response, "text", "")
 
     def send_message_with_config(
         self,
