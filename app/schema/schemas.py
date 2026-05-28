@@ -11,6 +11,10 @@ class ChatMessage(BaseModel):
     Represents a single message in the chat history
     """
 
+    role: str = Field(
+        default="user",
+        description="The message role. Use 'user', 'assistant', or 'model'.",
+    )
     content: str = Field(
         ..., min_length=1, description="The actual text content of the message"
     )
@@ -32,7 +36,9 @@ class ChatRequest(BaseModel):
     """
 
     message: str = Field(..., min_length=1, description="The message sent by the user")
-    history: Optional[List[ChatMessage]] = Field(default=[], description="History messages")
+    history: Optional[List[ChatMessage]] = Field(
+        default_factory=list, description="History messages"
+    )
     config: ChatConfig = Field(..., description="Configs for the AI Model")
 
 

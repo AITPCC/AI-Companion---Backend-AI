@@ -1,3 +1,4 @@
+from google.genai import types
 from fastapi import APIRouter, status
 
 from app.schema.schemas import ChatRequest, ChatResponse
@@ -19,7 +20,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
     try:
-        reply = ai_service.send_message(request.message)
+        history = request.history or []
+        combined = [
+            types.Content(
+                role="model" if msg.role in ["assistant", "model"] else "user",
+                parts=[types.Part(text=msg.content)],
+            )
+            for msg in history
+        ]
+        combined.append(
+            types.Content(role="user", parts=[types.Part(text=request.message)])
+        )
+        reply = ai_service.send_message(combined)
         return ChatResponse(status=status.HTTP_200_OK, content=reply, error=None)
     except ValueError as e:
         logger.warning(f"Validation error: {e}")
