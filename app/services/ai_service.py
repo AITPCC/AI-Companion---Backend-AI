@@ -1,341 +1,171 @@
 """
 AI Service Module
 -----------------
-This module provides a clean, reusable interface for interacting with Google's Gemini AI.
-It's designed to be easily plugged into any project that needs AI capabilities.
-
-Key Features:
-- System prompt support (defines AI personality/behavior)
-- Conversation history management (maintains context across messages)
-- Simple, encapsulated design (easy to use and maintain)
 """
 
 import os
-from typing import Any, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from functools import lru_cache
+from inspect import isawaitable
+from typing import Any, List, Optional
+from uuid import uuid4
 
 import google.genai as genai
+from google.adk.agents.llm_agent import LlmAgent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from app.schema.schemas import ChatConfig, ChatMessage
+
 from app.ai.prompts.chat_system_prompt import SYSTEM_PROMPT
 from app.core.config import get_settings
 
+_APP_NAME = "ai-companion"
+_USER_ID = "prototype-client"
 
-class AIService:
-    """
-    A service class for interacting with Google's Gemini AI.
 
-    This class encapsulates all AI functionality in one place, making it easy
-    to use AI capabilities in your projects.
+@lru_cache(maxsize=1)
+def _resolve_api_key() -> str:
+    """Resolve Google API key from settings/env for ADK runtime."""
+    settings = get_settings()
+    candidates = [
+        getattr(settings, "google_api_key", None),
+        os.getenv("GOOGLE_API_KEY"),
+        os.getenv("GEMINI_API_KEY"),
+    ]
+    for key in candidates:
+        if key and str(key).strip():
+            return str(key).strip()
+    raise ValueError("Missing Google API key. Set GOOGLE_API_KEY (or GEMINI_API_KEY).")
 
-    Attributes:
-        model_name (str): The Gemini model to use (default: "gemini-1.5-flash")
-        system_prompt (str): The initial instructions that define the AI's behavior
-        history (List[Dict]): The conversation history between user and AI
-    """
 
-    def __init__(
-        self,
+def _ensure_adk_auth() -> None:
+    """Ensure ADK/google-genai can discover API key at runtime."""
+    api_key = _resolve_api_key()
+    os.environ.setdefault("GOOGLE_API_KEY", api_key)
+    os.environ.setdefault("GEMINI_API_KEY", api_key)
+
+
+@lru_cache(maxsize=1)
+def _get_agent() -> LlmAgent:
+    """Create and cache a stateless ADK agent for process lifetime."""
+    _ensure_adk_auth()
+    settings = get_settings()
+    return LlmAgent(
+        name="ai_companion_agent",
+        model=settings.model_name,
+        instruction=SYSTEM_PROMPT,
+        generate_content_config=types.GenerateContentConfig(
+            temperature=settings.temperature,
+            max_output_tokens=settings.max_output_tokens,
+        ),
+    )
+
+
+def _normalize_history(history: Optional[Iterable[Any]]) -> list[tuple[str, str]]:
+    """Normalize optional history items into (role, content) tuples."""
+    normalized: list[tuple[str, str]] = []
+    for idx, item in enumerate(history or []):
+        role = getattr(item, "role", None)
+        content = getattr(item, "content", None)
+        if isinstance(item, dict):
+            role = item.get("role", role)
+            content = item.get("content", content)
+
+        if not content:
+            continue
+
+        normalized_role = str(role or ("user" if idx % 2 == 0 else "assistant")).lower()
+        if normalized_role not in {"user", "assistant", "model"}:
+            normalized_role = "user"
+
+        normalized.append((normalized_role, str(content)))
+
+    return normalized
+
+
+def _build_prompt(message: str | list[types.Content], history: Optional[Iterable[Any]]) -> str:
+    """Build a single user prompt that includes optional prior history context."""
+    parts: list[str] = []
+
+    normalized_history = _normalize_history(history)
+    if normalized_history:
+        parts.append("Conversation history:")
+        for role, content in normalized_history:
+            display_role = "assistant" if role == "model" else role
+            parts.append(f"- {display_role}: {content}")
+        parts.append("")
+
+    if isinstance(message, list):
+        if not message:
+            raise ValueError("Message list cannot be empty")
+
+        message_texts: list[str] = []
+        for content in message:
+            role = getattr(content, "role", "user")
+            text_parts: list[str] = []
+            for part in getattr(content, "parts", []) or []:
+                text = getattr(part, "text", None)
+                if text:
+                    text_parts.append(text)
+            if text_parts:
+                message_texts.append(f"{role}: {' '.join(text_parts)}")
+
+        if not message_texts:
+            raise ValueError("Message list cannot be empty")
+
+        parts.append("Current message:")
+        parts.extend(message_texts)
+        return "\n".join(parts).strip()
+
+    if not message or not message.strip():
+        raise ValueError("Message cannot be empty")
+
+    parts.append(f"Current message:\n{message.strip()}")
+    return "\n".join(parts).strip()
+
+
+async def ai_service(
+    message: str | list[types.Content],
+    history: Optional[Iterable[Any]] = None,
+) -> str:
+    """Run a stateless ADK LlmAgent completion for one request."""
+    _ensure_adk_auth()
+    session_service = InMemorySessionService()
+    runner = Runner(agent=_get_agent(), app_name=_APP_NAME, session_service=session_service)
+
+    session_id = str(uuid4())
+    created_session = session_service.create_session(
+        app_name=_APP_NAME,
+        user_id=_USER_ID,
+        session_id=session_id,
+    )
+    if isawaitable(created_session):
+        await created_session
+
+    new_message = types.Content(
+        role="user",
+        parts=[types.Part(text=_build_prompt(message=message, history=history))],
+    )
+
+    final_text = ""
+    async for event in runner.run_async(
+        user_id=_USER_ID,
+        session_id=session_id,
+        new_message=new_message,
     ):
-        """
-        Initialize the AI Service.
+        if not event.is_final_response() or not event.content:
+            continue
+        text_chunks = [
+            part.text for part in event.content.parts if getattr(part, "text", None)
+        ]
+        if text_chunks:
+            final_text = "\n".join(text_chunks).strip()
 
-        Args:
-            config (ChatConfig): Model configuration including mode, model_name, temperature.
-        """
-        self.api_key = get_settings().google_api_key
-        self.model_name = get_settings().model_name
-        self.temperature = get_settings().temperature
-        self.max_output_tokens = get_settings().max_output_tokens
-        # Create client
-        self.client = genai.Client(api_key=self.api_key)
-
-        # Store configuration
-        self.system_prompt = SYSTEM_PROMPT
-
-        # Initialize conversation history
-        # History is a list of dictionaries with 'role' and 'content' keys
-        # Example: [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi!"}]
-        self.history: List[Dict[str, str]] = []
-
-        # Initialize the model
-        self._initialize_model()
-
-    def _initialize_model(self):
-        """Prepare generation config."""
-        # Optional validation
-        try:
-            available = [m.name for m in self.client.models.list()]
-            if self.model_name not in available:
-                raise ValueError(f"Invalid model_name: {self.model_name}")
-        except Exception:
-            pass
-        # Generation configuration
-        self._gen_config = types.GenerateContentConfig(
-            system_instruction=self.system_prompt,
-            temperature=self.temperature,
-            max_output_tokens=self.max_output_tokens,
-        )
-
-    def send_message(self, message: str | list[types.Content]) -> str:
-        """
-        Send a message to the AI and get a response.
-
-        Args:
-            message: The current message text, or a prepared Gemini content list
-                containing request history followed by the current message.
-
-        Returns:
-            str: The AI's response
-
-        Example:
-            >>> service = AIService()
-            >>> response = service.send_message("What is Python?")
-            >>> print(response)
-            Python is a high-level programming language...
-        """
-        if isinstance(message, str):
-            contents = [types.Content(role="user", parts=[types.Part(text=message)])]
-        else:
-            contents = message
-
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=contents,
-            config=self._gen_config,
-        )
-        return getattr(response, "text", "")
-
-    def send_message_with_config(
-        self,
-        message: ChatMessage,
-        history: Optional[Iterable[ChatMessage]] = None,
-        config: Optional[ChatConfig] = None,
-    ) -> str:
-        """
-        Send a message using config values and an optional history list.
-
-        This aligns with the fields in schemas.py:
-        - config.model_name
-        - config.max_tokens
-        - config.temperature
-        - message: ChatMessage
-        - history: List[ChatMessage] (content only)
-        """
-        if config is not None:
-            self.update_config(config)
-
-        if history is not None:
-            self.load_history(self._normalize_history(history))
-
-        return self.send_message(message.content)
-
-    def get_history(self) -> List[Dict[str, str]]:
-        """
-        Get the full conversation history.
-
-        Returns:
-            List[Dict[str, str]]: List of messages with 'role' and 'content' keys
-
-        Example:
-            >>> history = service.get_history()
-            >>> for msg in history:
-            ...     print(f"{msg['role']}: {msg['content']}")
-        """
-        return self.history.copy()
-
-    def clear_history(self):
-        """
-        Clear the conversation history and start fresh.
-
-        This is useful when you want to start a new conversation without
-        the AI remembering previous messages.
-
-        Example:
-            >>> service.send_message("My name is John")
-            >>> service.clear_history()
-            >>> service.send_message("What's my name?")
-            # AI won't remember "John" because we cleared the history
-        """
-        self.history = []
-
-    def set_system_prompt(self, new_prompt: str):
-        """
-        Change the system prompt and reinitialize the model.
-
-        The system prompt defines how the AI should behave. Changing it
-        will restart the conversation with the new personality/instructions.
-
-        Args:
-            new_prompt (str): The new system prompt/instructions
-
-        Example:
-            >>> service = AIService(system_prompt="You are a helpful assistant")
-            >>> service.set_system_prompt("You are a Python expert who gives concise answers")
-            # Now the AI will behave as a Python expert
-        """
-        self.system_prompt = new_prompt
-        self.clear_history()
-        self._initialize_model()
-
-    def update_config(self, config: Union[ChatConfig, Dict[str, Any]]):
-        """
-        Update configuration using a config object or dict.
-
-        Expected fields: model_name, max_tokens, temperature.
-        """
-        model_name = getattr(config, "model_name", None)
-        max_tokens = getattr(config, "max_tokens", None)
-        temperature = getattr(config, "temperature", None)
-        if isinstance(config, dict):
-            model_name = config.get("model_name", model_name)
-            max_tokens = config.get("max_tokens", max_tokens)
-            temperature = config.get("temperature", temperature)
-
-        if model_name:
-            self.config.model_name = model_name
-        if max_tokens is not None:
-            self.config.max_tokens = max_tokens
-        if temperature is not None:
-            self.config.temperature = temperature
-
-        # Reinitialize to apply model/config changes.
-        self._initialize_model()
-
-    def load_history(self, history: List[Dict[str, str]]):
-        """
-        Load an existing conversation history.
-
-        This is useful for:
-        - Restoring a previous conversation
-        - Starting with pre-loaded context
-        - Testing specific conversation states
-
-        Args:
-            history (List[Dict[str, str]]): List of messages to load
-                Each message should have 'role' (either 'user' or 'assistant')
-                and 'content' (the message text)
-
-        Example:
-            >>> old_history = [
-            ...     {"role": "user", "content": "Hello"},
-            ...     {"role": "assistant", "content": "Hi! How can I help?"}
-            ... ]
-            >>> service.load_history(old_history)
-            >>> # Now the AI remembers this conversation
-        """
-        self.history = history.copy()
-
-        # Convert our history format to Gemini's format
-        gemini_history = []
-        for msg in self.history:
-            role = "user" if msg["role"] == "user" else "model"
-            gemini_history.append({"role": role, "parts": [msg["content"]]})
-
-        # Restart chat with the loaded history
-        self.chat_session = self.model.start_chat(history=gemini_history)
-
-    def _normalize_history(self, history: Iterable[Any]) -> List[Dict[str, str]]:
-        """
-        Normalize a history list into [{"role": "...", "content": "..."}] format.
-
-        Supports:
-        - Dicts with 'role' + 'content'
-        - Objects with a 'content' attribute (from schemas.ChatMessage)
-
-        If role is missing, messages alternate between user/model starting with user.
-        """
-        normalized: List[Dict[str, str]] = []
-        fallback_role = "user"
-
-        for msg in history:
-            if isinstance(msg, dict):
-                content = msg.get("content")
-                role = msg.get("role", fallback_role)
-            else:
-                content = getattr(msg, "content", None)
-                role = getattr(msg, "role", fallback_role)
-
-            if not content:
-                continue
-
-            normalized.append({"role": role, "content": content})
-
-            # Alternate role if role was not explicitly set
-            if "role" not in (msg if isinstance(msg, dict) else {}):
-                fallback_role = "assistant" if fallback_role == "user" else "user"
-
-        return normalized
-
-
-# Singleton instance of the AIService
-ai_service = AIService()
+    return final_text
 
 
 def list_available_models(api_key: Optional[str] = None) -> List[str]:
-    """
-    List all available Gemini models for your API key.
-
-    This is helpful to see which models you can use.
-
-    Args:
-        api_key (str, optional): Your API key (or use GOOGLE_API_KEY env variable)
-
-    Returns:
-        List[str]: List of available model names
-
-    Example:
-        >>> models = list_available_models()
-        >>> print(models)
-        ['gemini-pro', 'gemini-1.5-pro', ...]
-    """
-    api_key = api_key or os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError("No API key provided")
-
-    client = genai.Client(api_key=api_key)
-    models = [m.name for m in client.models.list()]
-    return models
-
-
-# Convenience function for quick usage without creating a class instance
-def quick_chat(
-    message: str, api_key: Optional[str] = None, system_prompt: Optional[str] = None
-) -> str:
-    """
-    Quick way to get a single AI response without managing a service instance.
-
-    This is useful for one-off questions where you don't need conversation history.
-
-    Args:
-        message (str): Your message/question
-        api_key (str, optional): Your API key (or use GOOGLE_API_KEY env variable)
-        system_prompt (str, optional): System instructions for the AI
-
-    Returns:
-        str: The AI's response
-
-    Example:
-        >>> response = quick_chat("What is 2+2?")
-        >>> print(response)
-        4
-    """
-    # Use default ChatConfig for quick usage
-    default_cfg = ChatConfig()
-    service = AIService(
-        config=default_cfg, api_key=api_key, system_prompt=system_prompt
-    )
-    return service.send_message(message)
-
-
-if __name__ == "__main__":
-    # This code only runs when you execute this file directly
-    # It won't run when you import this module into another file
-
-    print("AI Service Module")
-    print("=" * 50)
-    print("\nThis module is meant to be imported and used in other files.")
-    print("\nExample usage:")
-    print("    from ai_service import AIService")
-    print("    service = AIService()")
-    print("    response = service.send_message('Hello!')")
-    print("\nRun test.py to see full examples!")
+    """List all available Gemini models for the provided (or configured) API key."""
+    resolved_api_key = api_key or _resolve_api_key()
+    client = genai.Client(api_key=resolved_api_key)
+    return [m.name for m in client.models.list()]
