@@ -39,6 +39,9 @@ The service is designed to be easily extensible, allowing you to plug in differe
 - **[uv](https://github.com/astral-sh/uv)** - Fast Python package installer and resolver
 - **[Pydantic](https://docs.pydantic.dev/)** - Data validation using Python type annotations
 - **[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)** - Settings management
+- **[SQLModel](https://sqlmodel.tiangolo.com/)** - SQLAlchemy-based models for database tables
+- **[Alembic](https://alembic.sqlalchemy.org/)** - Database migrations
+- **[Docker Compose](https://docs.docker.com/compose/)** - Local PostgreSQL development database
 
 ### Project Management
 
@@ -70,6 +73,15 @@ AI-Companion---Backend-AI/
 │   │   ├── __init__.py
 │   │   └── schemas.py            # Request/Response models (ChatRequest, ChatResponse, etc.)
 │   │
+│   ├── models/                   # SQLModel database models
+│   │   ├── __init__.py
+│   │   └── user.py               # User table model
+│   │
+│   ├── db/                       # Database engine and session helpers
+│   │   ├── __init__.py
+│   │   ├── engine.py
+│   │   └── session.py
+│   │
 │   ├── services/                 # Business logic and services
 │   │   ├── __init__.py
 │   │   ├── ai_service.py         # AI service implementation (Gemini integration)
@@ -84,6 +96,9 @@ AI-Companion---Backend-AI/
 │   │
 │   └── .env.sample               # Environment variables template
 │
+├── alembic/                      # Database migration configuration and revisions
+├── docker-compose.yml            # Local PostgreSQL service
+├── Makefile                      # Local development shortcuts
 ├── pyproject.toml               # Project dependencies and metadata
 ├── uv.lock                      # Locked dependency versions
 ├── .python-version              # Python version specification
@@ -96,8 +111,11 @@ AI-Companion---Backend-AI/
 - **`app/api/`**: Contains all API route definitions. Routes are organized by feature (chat, health) and combined in `router.py`.
 - **`app/core/`**: Core application settings loaded from environment variables.
 - **`app/schema/`**: Pydantic models that define request/response structures and validation rules.
+- **`app/models/`**: SQLModel table models used by Alembic and database sessions.
+- **`app/db/`**: Database engine and FastAPI session dependency helpers.
 - **`app/services/`**: Business logic layer, including the AI service that handles Gemini API interactions.
 - **`app/ai/prompts/`**: System prompts that define the AI's personality and behavior patterns.
+- **`alembic/`**: Database migration environment and revision files.
 
 ## 🚀 Local Setup Guide
 
@@ -107,6 +125,7 @@ This guide will help you set up the project locally using `uv`, a fast Python pa
 
 - **Python 3.12 or higher** installed on your system
 - **uv** installed (see installation instructions below)
+- **Docker Desktop** or another Docker runtime for the local PostgreSQL database
 - **Google Gemini API Key** (get one from [Google AI Studio](https://makersuite.google.com/app/apikey))
 
 ### Step 1: Install uv
@@ -144,6 +163,7 @@ cd AI-Companion---Backend-AI
 
    ```env
    GOOGLE_API_KEY=your-actual-api-key-here
+   DATABASE_URL=postgresql+psycopg://ai_companion:ai_companion@localhost:5432/ai_companion
    ```
 
 ### Step 4: Install Dependencies
@@ -160,7 +180,32 @@ This command will:
 - Install all dependencies from `pyproject.toml`
 - Generate/update `uv.lock` file
 
-### Step 5: Run the Application
+### Step 5: Start the Database
+
+Start the local PostgreSQL container:
+
+```bash
+make db-up
+```
+
+Apply database migrations:
+
+```bash
+make db-upgrade
+```
+
+Migration helpers:
+
+```bash
+make db-upgrade             # Upgrade to latest revision
+make db-upgrade REV=<rev>   # Upgrade to a specific revision
+make db-downgrade           # Downgrade one revision
+make db-downgrade DOWN_REV=<rev>  # Downgrade to a specific revision, such as base
+make db-current             # Show current database revision
+make db-history             # Show migration history
+```
+
+### Step 6: Run the Application
 
 **Option 1: Using uv run (Recommended)**
 
@@ -182,7 +227,7 @@ fastapi dev app/main.py
 
 The server will start at `http://127.0.0.1:8000`
 
-### Step 6: Verify Installation
+### Step 7: Verify Installation
 
 1. **Check health endpoint:**
 
@@ -277,6 +322,7 @@ Configuration is managed through environment variables in `app/.env`:
 | `MODEL_NAME`        | Gemini model to use         | `gemini-2.5-flash` |
 | `TEMPERATURE`       | Model temperature (0.0-1.0) | `0.7`              |
 | `MAX_OUTPUT_TOKENS` | Maximum tokens in response  | `1000`             |
+| `DATABASE_URL`      | SQLAlchemy database URL     | `postgresql+psycopg://ai_companion:ai_companion@localhost:5432/ai_companion` |
 
 ## 📚 Additional Resources
 

@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel
 
-# Import table models here so Alembic autogenerate picks them up.
-# from app.models.example import Example  # noqa: F401
+from app.models.user import User
 
-__all__ = ["SQLModel"]
+# Import table models here so Alembic autogenerate picks them up.
+
+__all__ = ["SQLModel", "User"]
