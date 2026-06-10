@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     google_api_key: str
+    database_url: str = (
+        "postgresql+psycopg://ai_companion:ai_companion@localhost:5432/ai_companion"
+    )
     model_name: str = "gemini-2.5-flash"
     temperature: float = 0.7
     max_output_tokens: int = 1000
