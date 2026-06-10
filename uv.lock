@@ -27,7 +27,7 @@ requires-dist = [
     { name = "google-adk", specifier = ">=1.18.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
     { name = "sqlalchemy", specifier = ">=2.0.46" },
-    { name = "sqlmodel", specifier = ">=0.0.24" },
+    { name = "sqlmodel", specifier = ">=0.0.38" },
 ]
 
 [[package]]
