@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:18
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ai_companion
+      POSTGRES_PASSWORD: ai_companion
+      POSTGRES_DB: ai_companion
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_companion -d ai_companion"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
