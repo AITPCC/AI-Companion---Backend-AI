@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     temperature: float = 0.7
     max_output_tokens: int = 1000
     model_config = SettingsConfigDict(env_file="app/.env")
-
+    database_url: str = (
+    "postgresql+psycopg://ai_companion:ai_companion@localhost:5432/ai_companion"
+)
 
 @lru_cache
 def get_settings():
