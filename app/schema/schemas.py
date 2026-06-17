@@ -2,7 +2,9 @@
 Schemas for chat request and response using Pydantic
 """
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 
 
@@ -56,4 +58,26 @@ class ChatResponse(BaseModel):
     )
 
 
-__all__ = ["ChatMessage", "ChatConfig", "ChatRequest", "ChatResponse"]
+class RegisterRequest(BaseModel):
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+    user_name: str = Field(
+        ..., min_length=1, max_length=100, description="Display name"
+    )
+
+
+class UserProfile(BaseModel):
+    user_id: int = Field(..., description="Unique user identifier")
+    user_name: str = Field(..., description="Display name")
+    email: EmailStr = Field(..., description="User email address")
+    created_at: datetime = Field(..., description="Account creation timestamp")
+
+
+__all__ = [
+    "ChatMessage",
+    "ChatConfig",
+    "ChatRequest",
+    "ChatResponse",
+    "RegisterRequest",
+    "UserProfile",
+]
