@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.db.session import SessionDep
 from app.schema.schemas import LoginRequest, LoginResponse, RegisterRequest, UserProfile
 from app.services import auth_service, user_service
 
@@ -8,8 +9,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserProfile)
-async def register(request: RegisterRequest) -> UserProfile:
-    if user_service.find_by_email(request.email):
+async def register(request: RegisterRequest, session: SessionDep) -> UserProfile:
+    if user_service.find_by_email(session, request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
@@ -17,25 +18,26 @@ async def register(request: RegisterRequest) -> UserProfile:
 
     password_hash = auth_service.hash_password(request.password)
     user = user_service.create_user(
+        session,
         user_name=request.user_name,
         email=request.email,
         password_hash=password_hash,
     )
 
     return UserProfile(
-        user_id=user["user_id"],
-        user_name=user["user_name"],
-        email=user["user_email"],
-        created_at=user["created_at"],
+        user_id=user.user_id,
+        user_name=user.user_name,
+        email=user.user_email,
+        created_at=user.created_at,
     )
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest) -> LoginResponse | JSONResponse:
-    user = user_service.find_by_email(request.email)
+async def login(request: LoginRequest, session: SessionDep) -> LoginResponse | JSONResponse:
+    user = user_service.find_by_email(session, request.email)
     invalid_credentials = user is None or not auth_service.verify_password(
         request.password,
-        user["password_hash"] if user else "",
+        user.password_hash if user else "",
     )
 
     if invalid_credentials:
@@ -45,6 +47,6 @@ async def login(request: LoginRequest) -> LoginResponse | JSONResponse:
         )
 
     return LoginResponse(
-        access_token=auth_service.create_access_token(user["user_id"]),
+        access_token=auth_service.create_access_token(user.user_id),
         token_type="bearer",
     )
