@@ -73,6 +73,16 @@ class UserProfile(BaseModel):
     created_at: datetime = Field(..., description="Account creation timestamp")
 
 
+class LoginRequest(BaseModel):
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 __all__ = [
     "ChatMessage",
     "ChatConfig",
@@ -80,4 +90,6 @@ __all__ = [
     "ChatResponse",
     "RegisterRequest",
     "UserProfile",
+    "LoginRequest",
+    "LoginResponse",
 ]
