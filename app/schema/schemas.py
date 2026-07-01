@@ -60,7 +60,7 @@ class ChatResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
-    password: str = Field(..., description="User password")
+    password: str = Field(..., min_length=8, max_length=100, description="User password")
     user_name: str = Field(
         ..., min_length=1, max_length=100, description="Display name"
     )
