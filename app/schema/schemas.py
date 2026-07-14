@@ -66,6 +66,10 @@ class RegisterRequest(BaseModel):
     )
 
 
+class UpdateUserRequest(BaseModel):
+    user_name: str = Field(..., min_length=1, max_length=100, description="New display name")
+
+
 class UserProfile(BaseModel):
     user_id: int = Field(..., description="Unique user identifier")
     user_name: str = Field(..., description="Display name")
@@ -89,6 +93,7 @@ __all__ = [
     "ChatRequest",
     "ChatResponse",
     "RegisterRequest",
+    "UpdateUserRequest",
     "UserProfile",
     "LoginRequest",
     "LoginResponse",

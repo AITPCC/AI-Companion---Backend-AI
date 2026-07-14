@@ -25,6 +25,10 @@ def find_by_id(session: Session, user_id: int) -> User | None:
     return database.find_user_by_id(session, user_id)
 
 
+def update_user_name(session: Session, user: User, user_name: str) -> User:
+    return database.update_user_name(session, user, user_name)
+
+
 def to_user_profile(user: User) -> UserProfile:
     return UserProfile(
         user_id=user.user_id,

@@ -31,3 +31,11 @@ def create_user(
 def find_user_by_id(session: Session, user_id: int) -> User | None:
     statement = select(User).where(User.user_id == user_id)
     return session.exec(statement).first()
+
+
+def update_user_name(session: Session, user: User, user_name: str) -> User:
+    user.user_name = user_name
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
