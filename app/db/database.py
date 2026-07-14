@@ -27,3 +27,7 @@ def create_user(
     session.commit()
     session.refresh(user)
     return user
+
+def find_user_by_id(session: Session, user_id: int) -> User | None:
+    statement = select(User).where(User.user_id == user_id)
+    return session.exec(statement).first()

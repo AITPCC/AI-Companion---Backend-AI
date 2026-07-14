@@ -18,3 +18,7 @@ def create_user(session: Session, user_name: str, email: str, password_hash: str
         password_hash=password_hash,
         created_at=created_at,
     )
+
+
+def find_by_id(session: Session, user_id: int) -> User | None:
+    return database.find_user_by_id(session, user_id)
