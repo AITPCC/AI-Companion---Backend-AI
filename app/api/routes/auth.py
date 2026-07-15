@@ -24,12 +24,7 @@ async def register(request: RegisterRequest, session: SessionDep) -> UserProfile
         password_hash=password_hash,
     )
 
-    return UserProfile(
-        user_id=user.user_id,
-        user_name=user.user_name,
-        email=user.user_email,
-        created_at=user.created_at,
-    )
+    return user_service.to_user_profile(user)
 
 
 @router.post("/login", response_model=LoginResponse)
