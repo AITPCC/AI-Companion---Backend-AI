@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    environment: str = "development"
     model_config = SettingsConfigDict(env_file="app/.env")
     database_url: str = (
     "postgresql+psycopg://ai_companion:ai_companion@localhost:5432/ai_companion"
