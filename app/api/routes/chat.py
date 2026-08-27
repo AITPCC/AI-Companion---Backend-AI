@@ -33,8 +33,10 @@ async def chat(
         return ChatResponse(
             status=status.HTTP_400_BAD_REQUEST, content=None, error=str(e)
         )
-    except Exception as e:
-        logger.error(f"AI error: {e}")
+    except Exception:
+        logger.exception("AI request failed")
         return ChatResponse(
-            status=status.HTTP_503_SERVICE_UNAVAILABLE, content=None, error=str(e)
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=None,
+            error="The chat service is temporarily unavailable",
         )
