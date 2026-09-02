@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from fastapi import HTTPException, status
 from fastapi.security import HTTPBearer
-import jwt
+import jwt, secrets
 
 from app.core.config import get_settings
 
@@ -28,6 +28,20 @@ def create_access_token(user_id: int) -> str:
     token = jwt.encode(
         payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
     )
+    return token if isinstance(token, str) else token.decode()
+
+
+def create_guest_token() -> str:
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=24)
+    payload = {
+        "token_type": "guest",
+        "guest_id": secrets.token_urlsafe(16),
+        "iat": now,
+        "exp": expires_at,
+    }
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return token if isinstance(token, str) else token.decode()
 
 

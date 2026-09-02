@@ -1,4 +1,6 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Depends
+
+from app.api.dependencies import Actor, current_actor
 
 from app.schema.schemas import ChatRequest, ChatResponse
 from app.services.ai_service import ai_service
@@ -10,7 +12,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("/completions", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest,
+    actor: Actor = Depends(current_actor)) -> ChatResponse:
     if not request.message or not request.message.strip():
         return ChatResponse(
             status=status.HTTP_400_BAD_REQUEST,
@@ -29,8 +33,10 @@ async def chat(request: ChatRequest) -> ChatResponse:
         return ChatResponse(
             status=status.HTTP_400_BAD_REQUEST, content=None, error=str(e)
         )
-    except Exception as e:
-        logger.error(f"AI error: {e}")
+    except Exception:
+        logger.exception("AI request failed")
         return ChatResponse(
-            status=status.HTTP_503_SERVICE_UNAVAILABLE, content=None, error=str(e)
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=None,
+            error="The chat service is temporarily unavailable",
         )

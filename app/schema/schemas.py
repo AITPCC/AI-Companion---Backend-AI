@@ -4,8 +4,8 @@ Schemas for chat request and response using Pydantic
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from typing import Annotated, List, Optional
 
 
 class ChatMessage(BaseModel):
@@ -18,7 +18,7 @@ class ChatMessage(BaseModel):
         description="The message role. Use 'user', 'assistant', or 'model'.",
     )
     content: str = Field(
-        ..., min_length=1, description="The actual text content of the message"
+        ..., min_length=1, max_length=4000, description="The actual text content of the message"
     )
 
 
@@ -37,9 +37,9 @@ class ChatRequest(BaseModel):
     Represents a chat request from the user
     """
 
-    message: str = Field(..., min_length=1, description="The message sent by the user")
+    message: str = Field(..., min_length=1, max_length=4000, description="The message sent by the user")
     history: Optional[List[ChatMessage]] = Field(
-        default_factory=list, description="History messages"
+        default_factory=list, max_length=20, description="History messages"
     )
     config: ChatConfig = Field(..., description="Configs for the AI Model")
 
@@ -61,13 +61,15 @@ class ChatResponse(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=100, description="User password")
-    user_name: str = Field(
-        ..., min_length=1, max_length=100, description="Display name"
-    )
+    user_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    ] = Field(..., description="Display name")
 
 
 class UpdateUserRequest(BaseModel):
-    user_name: str = Field(..., min_length=1, max_length=100, description="New display name")
+    user_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    ] = Field(..., description="New display name")
 
 
 class UserProfile(BaseModel):

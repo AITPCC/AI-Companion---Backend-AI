@@ -45,3 +45,11 @@ async def login(request: LoginRequest, session: SessionDep) -> LoginResponse | J
         access_token=auth_service.create_access_token(user.user_id),
         token_type="bearer",
     )
+
+
+@router.post("/guest-session", status_code=status.HTTP_201_CREATED, response_model=LoginResponse)
+async def guest_session() -> LoginResponse:
+    return LoginResponse(
+        access_token=auth_service.create_guest_token(),
+        token_type="bearer",
+    )
