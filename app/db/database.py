@@ -1,7 +1,9 @@
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, select
 
+from app.models.quota import Quota
 from app.models.user import User
 
 
@@ -39,3 +41,28 @@ def update_user_name(session: Session, user: User, user_name: str) -> User:
     session.commit()
     session.refresh(user)
     return user
+
+
+def upsert_quota_and_increment(
+    session: Session,
+    actor_kind: str,
+    actor_id: str,
+    endpoint: str,
+    window_start: datetime,
+) -> int:
+    stmt = pg_insert(Quota.__table__).values(
+        actor_kind=actor_kind,
+        actor_id=actor_id,
+        endpoint=endpoint,
+        window_start=window_start,
+        request_count=1,
+    )
+    stmt = stmt.on_conflict_do_update(
+        constraint="uq_quota_key",
+        set_={"request_count": Quota.__table__.c.request_count + 1},
+    ).returning(Quota.__table__.c.request_count)
+
+    result = session.exec(stmt)
+    new_count = result.one()[0]
+    session.commit()
+    return new_count
