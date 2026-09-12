@@ -30,6 +30,7 @@ def create_user(
     session.refresh(user)
     return user
 
+
 def find_user_by_id(session: Session, user_id: int) -> User | None:
     statement = select(User).where(User.user_id == user_id)
     return session.exec(statement).first()
@@ -43,13 +44,14 @@ def update_user_name(session: Session, user: User, user_name: str) -> User:
     return user
 
 
-def upsert_quota_and_increment(
+def reserve_quota(
     session: Session,
     actor_kind: str,
     actor_id: str,
     endpoint: str,
     window_start: datetime,
-) -> int:
+    limit: int,
+) -> bool:
     stmt = pg_insert(Quota.__table__).values(
         actor_kind=actor_kind,
         actor_id=actor_id,
@@ -60,9 +62,10 @@ def upsert_quota_and_increment(
     stmt = stmt.on_conflict_do_update(
         constraint="uq_quota_key",
         set_={"request_count": Quota.__table__.c.request_count + 1},
+        where=Quota.__table__.c.request_count < limit,
     ).returning(Quota.__table__.c.request_count)
 
     result = session.exec(stmt)
-    new_count = result.one()[0]
+    row = result.first()
     session.commit()
-    return new_count
+    return row is not None

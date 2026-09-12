@@ -1,13 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, Request, status
 
+from app.api.client_ip import client_ip
 from app.api.dependencies import Actor, current_actor
-
-from app.db.session import SessionDep
-from app.schema.schemas import ChatRequest, ChatResponse
-from app.services.ai_service import ai_service
-from app.logger import get_logger
-from app.services import quota_service
 from app.core.config import get_settings
+from app.logger import get_logger
+from app.schema.schemas import ChatRequest, ChatResponse
+from app.services import quota_service
+from app.services.ai_service import ai_service
+from app.services.quota_service import Budget
 
 logger = get_logger(name=__name__)
 
@@ -18,21 +18,38 @@ settings = get_settings()
 
 @router.post("/completions", response_model=ChatResponse)
 async def chat(
-    request: ChatRequest,
-    session: SessionDep,
-    actor: Actor = Depends(current_actor)) -> ChatResponse:
-    limit = settings.chat_guest_limit if actor.kind == "guest" else settings.chat_user_limit
-    allowed = quota_service.check_and_increment(
-        session, actor.kind, actor.id, "chat", limit, settings.chat_window_seconds
-    )
-    if not allowed:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
+    request: ChatRequest, http_request: Request, actor: Actor = Depends(current_actor)
+) -> ChatResponse:
     if not request.message or not request.message.strip():
         return ChatResponse(
             status=status.HTTP_400_BAD_REQUEST,
             content=None,
             error="Message cannot be empty",
         )
+
+    if actor.kind == "guest":
+        # This budget survives minting a new guest token.
+        await quota_service.reserve_async(
+            Budget(
+                "guest_ip",
+                client_ip(http_request),
+                "chat",
+                settings.guest_source_limit,
+                settings.chat_window_seconds,
+            )
+        )
+    limit = (
+        settings.chat_guest_limit if actor.kind == "guest" else settings.chat_user_limit
+    )
+    await quota_service.reserve_async(
+        Budget(
+            actor.kind,
+            actor.id,
+            "chat",
+            limit,
+            settings.chat_window_seconds,
+        )
+    )
 
     try:
         reply = await ai_service(

@@ -21,5 +21,5 @@ RUN uv sync --frozen --no-dev
 # Expose port
 EXPOSE 8080
 
-# Start FastAPI with the FastAPI CLI
-CMD ["uv", "run", "fastapi", "run", "app/main.py", "--port", "8080", "--host", "0.0.0.0"]
+# Resolve proxy headers in app/api/client_ip.py against an explicit trust list.
+CMD ["uv", "run", "uvicorn", "app.main:app", "--port", "8080", "--host", "0.0.0.0", "--no-proxy-headers"]

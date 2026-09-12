@@ -1,32 +1,33 @@
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from app.api.client_ip import client_ip
 from app.core.config import get_settings
 from app.db.session import SessionDep
 from app.schema.schemas import LoginRequest, LoginResponse, RegisterRequest, UserProfile
 from app.services import auth_service, quota_service, user_service
+from app.services.quota_service import Budget, identity_key
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 settings = get_settings()
 
 
-def _client_ip(http_request: Request) -> str:
-    return http_request.client.host if http_request.client else "unknown"
-
-
-@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserProfile)
-async def register(request: RegisterRequest, http_request: Request, session: SessionDep) -> UserProfile:
-    allowed = quota_service.check_and_increment(
-        session,
-        "register",
-        _client_ip(http_request),
-        "register",
-        settings.register_limit,
-        settings.register_window_seconds,
+@router.post(
+    "/register", status_code=status.HTTP_201_CREATED, response_model=UserProfile
+)
+def register(
+    request: RegisterRequest, http_request: Request, session: SessionDep
+) -> UserProfile:
+    quota_service.reserve(
+        Budget(
+            "register",
+            client_ip(http_request),
+            "register",
+            settings.register_limit,
+            settings.register_window_seconds,
+        )
     )
-    if not allowed:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
 
     if user_service.find_by_email(session, request.email):
         raise HTTPException(
@@ -46,7 +47,18 @@ async def register(request: RegisterRequest, http_request: Request, session: Ses
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, http_request: Request, session: SessionDep) -> LoginResponse | JSONResponse:
+def login(
+    request: LoginRequest, http_request: Request, session: SessionDep
+) -> LoginResponse | JSONResponse:
+    reservation = quota_service.reserve(
+        Budget(
+            "login",
+            identity_key(request.email.strip().lower(), client_ip(http_request)),
+            "login",
+            settings.login_limit,
+            settings.login_window_seconds,
+        )
+    )
     user = user_service.find_by_email(session, request.email)
     invalid_credentials = user is None or not auth_service.verify_password(
         request.password,
@@ -54,32 +66,25 @@ async def login(request: LoginRequest, http_request: Request, session: SessionDe
     )
 
     if invalid_credentials:
-        normalized_email = request.email.strip().lower()
-        actor_id = f"{normalized_email}:{_client_ip(http_request)}"
-        allowed = quota_service.check_and_increment(
-            session,
-            "login",
-            actor_id,
-            "login",
-            settings.login_limit,
-            settings.login_window_seconds,
-        )
-        if not allowed:
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
-
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"status": 400, "error": "Invalid email or password"},
         )
 
+    user_id = user.user_id
+    # Release the read transaction before the refund opens its own connection.
+    session.rollback()
+    quota_service.refund(reservation)
     return LoginResponse(
-        access_token=auth_service.create_access_token(user.user_id),
+        access_token=auth_service.create_access_token(user_id),
         token_type="bearer",
     )
 
 
-@router.post("/guest-session", status_code=status.HTTP_201_CREATED, response_model=LoginResponse)
-async def guest_session() -> LoginResponse:
+@router.post(
+    "/guest-session", status_code=status.HTTP_201_CREATED, response_model=LoginResponse
+)
+def guest_session() -> LoginResponse:
     return LoginResponse(
         access_token=auth_service.create_guest_token(),
         token_type="bearer",
