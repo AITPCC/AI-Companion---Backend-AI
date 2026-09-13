@@ -27,7 +27,7 @@ def upgrade() -> None:
     sa.Column('actor_kind', sqlmodel.sql.sqltypes.AutoString(length=10), nullable=False),
     sa.Column('actor_id', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
     sa.Column('endpoint', sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
-    sa.Column('window_start', sa.DateTime(), nullable=False),
+    sa.Column('window_start', sa.DateTime(timezone=True), nullable=False),
     sa.Column('request_count', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('quota_id'),
     sa.UniqueConstraint('actor_kind', 'actor_id', 'endpoint', 'window_start', name='uq_quota_key')

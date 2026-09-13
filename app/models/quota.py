@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import DateTime, UniqueConstraint
 from sqlmodel import SQLModel, Field
 
 
@@ -16,5 +16,5 @@ class Quota(SQLModel, table=True):
     actor_kind: str = Field(max_length=10, nullable=False)
     actor_id: str = Field(max_length=255, nullable=False)
     endpoint: str = Field(max_length=50, nullable=False)
-    window_start: datetime = Field(nullable=False)
+    window_start: datetime = Field(sa_type=DateTime(timezone=True), nullable=False)
     request_count: int = Field(default=0, nullable=False)

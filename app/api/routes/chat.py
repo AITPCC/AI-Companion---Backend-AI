@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, Request, status, Depends
 
 from app.api.dependencies import Actor, current_actor
 
@@ -19,11 +19,16 @@ settings = get_settings()
 @router.post("/completions", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
+    http_request: Request,
     session: SessionDep,
     actor: Actor = Depends(current_actor)) -> ChatResponse:
     limit = settings.chat_guest_limit if actor.kind == "guest" else settings.chat_user_limit
+    actor_id = actor.id
+    if actor.kind == "guest":
+        # A new guest token should not create a fresh quota.
+        actor_id = http_request.client.host if http_request.client else "unknown"
     allowed = quota_service.check_and_increment(
-        session, actor.kind, actor.id, "chat", limit, settings.chat_window_seconds
+        session, actor.kind, actor_id, "chat", limit, settings.chat_window_seconds
     )
     if not allowed:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")

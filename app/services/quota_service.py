@@ -1,8 +1,16 @@
+"""Simple fixed-window quotas backed by PostgreSQL."""
+
 from datetime import datetime, timezone
+from hashlib import sha256
 
 from sqlmodel import Session
 
 from app.db import database
+
+
+def hash_key(*parts: str) -> str:
+    """Create a fixed-length key without storing an email address in plain text."""
+    return sha256("\0".join(parts).encode()).hexdigest()
 
 
 def get_window_start(window_seconds: int) -> datetime:
@@ -21,7 +29,6 @@ def check_and_increment(
     window_seconds: int,
 ) -> bool:
     window_start = get_window_start(window_seconds)
-    new_count = database.upsert_quota_and_increment(
-        session, actor_kind, actor_id, endpoint, window_start
+    return database.upsert_quota_and_increment(
+        session, actor_kind, actor_id, endpoint, window_start, limit
     )
-    return new_count <= limit

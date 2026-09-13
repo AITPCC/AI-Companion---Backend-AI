@@ -47,6 +47,24 @@ async def register(request: RegisterRequest, http_request: Request, session: Ses
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, http_request: Request, session: SessionDep) -> LoginResponse | JSONResponse:
+    # Count every attempt so a blocked caller never reaches password verification.
+    actor_id = quota_service.hash_key(
+        request.email.strip().lower(), _client_ip(http_request)
+    )
+    allowed = quota_service.check_and_increment(
+        session,
+        "login",
+        actor_id,
+        "login",
+        settings.login_limit,
+        settings.login_window_seconds,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests",
+        )
+
     user = user_service.find_by_email(session, request.email)
     invalid_credentials = user is None or not auth_service.verify_password(
         request.password,
@@ -54,19 +72,6 @@ async def login(request: LoginRequest, http_request: Request, session: SessionDe
     )
 
     if invalid_credentials:
-        normalized_email = request.email.strip().lower()
-        actor_id = f"{normalized_email}:{_client_ip(http_request)}"
-        allowed = quota_service.check_and_increment(
-            session,
-            "login",
-            actor_id,
-            "login",
-            settings.login_limit,
-            settings.login_window_seconds,
-        )
-        if not allowed:
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
-
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"status": 400, "error": "Invalid email or password"},
