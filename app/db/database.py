@@ -49,7 +49,8 @@ def upsert_quota_and_increment(
     actor_id: str,
     endpoint: str,
     window_start: datetime,
-) -> int:
+    limit: int,
+) -> bool:
     stmt = pg_insert(Quota.__table__).values(
         actor_kind=actor_kind,
         actor_id=actor_id,
@@ -60,9 +61,10 @@ def upsert_quota_and_increment(
     stmt = stmt.on_conflict_do_update(
         constraint="uq_quota_key",
         set_={"request_count": Quota.__table__.c.request_count + 1},
+        where=Quota.__table__.c.request_count < limit,
     ).returning(Quota.__table__.c.request_count)
 
     result = session.exec(stmt)
-    new_count = result.one()[0]
+    row = result.first()
     session.commit()
-    return new_count
+    return row is not None
