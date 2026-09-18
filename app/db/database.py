@@ -43,6 +43,11 @@ def update_user_name(session: Session, user: User, user_name: str) -> User:
     return user
 
 
+def delete_user(session: Session, user: User) -> None:
+    session.delete(user)
+    session.commit()
+
+
 def upsert_quota_and_increment(
     session: Session,
     actor_kind: str,

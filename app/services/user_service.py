@@ -33,6 +33,10 @@ def update_user_name(session: Session, user: User, user_name: str) -> User:
     return database.update_user_name(session, user, user_name)
 
 
+def delete_user(session: Session, user: User) -> None:
+    database.delete_user(session, user)
+
+
 def to_user_profile(user: User) -> UserProfile:
     return UserProfile(
         user_id=user.user_id,
